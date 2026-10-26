@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import random
 import gym_gazebo
 import gymnasium as gym
@@ -13,9 +14,13 @@ def main():
     action_space = env.action_space
 
     epsilon = 0.8
-    epsilon_decay = 0.99
+    epsilon_decay = 0.97
 
-    q_table = np.zeros((observation_space.n, action_space.n))
+    # Check if previous training data exists
+    if os.path.exists("q_table.csv"):
+        q_table = loadQ("q_table.csv")
+    else:
+        q_table = np.zeros((observation_space.n, action_space.n))
 
     highest_reward = 0
 
@@ -50,6 +55,8 @@ def main():
                 highest_reward = total_reward
                 print("New highest reward: {total_reward}.")
 
+                saveQ(q_table)
+
             env.reset()
             epsilon = max(0.01, epsilon * epsilon_decay)  # Decay epsilon
 
@@ -66,7 +73,13 @@ def learn(state, action, next_state, reward, q_table):
     alpha = 0.1
     gamma = 0.9
 
-    # TODO: Implement update Q values using the Bellman update equation
+    # If the episode terminates (no line), there is no future Q-value
+    if next_state == -1:
+        target = reward
+    else:
+        target = reward + gamma * np.max(q_table[next_state])
+
+    q_table[state, action] += alpha * (target - q_table[state, action])
 
     return q_table
 
@@ -74,22 +87,23 @@ def learn(state, action, next_state, reward, q_table):
 def choose_action(state, q_table, epsilon, action_space):
     action = 0
 
-    # TODO: Implement choose action.
-    
+    if random.random() < epsilon:
+        action = action_space.sample()
+    elif not np.any(q_table[state]):
+        action = action_space.sample()
+    else:
+        action = np.argmax(q_table[state])
     return action
 
 
-def saveQ(q_table, save_path):
+def saveQ(q_table, save_path="q_table.csv"):
+    np.savetxt(save_path, q_table, delimiter=",")
+    print(f"Q-table saved to {save_path}")
 
-    # TODO: Implement saving the Q values
-
-    return
-
-def loadQ(load_path):
-
-    # TODO: Implement loading the Q values
-
-    return
+def loadQ(load_path="q_table.csv"):
+    q_table = np.loadtxt(load_path, delimiter=",")
+    print(f"Q-table loaded from {load_path}")
+    return q_table
 
 if __name__ == "__main__":
     main()
